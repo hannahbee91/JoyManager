@@ -11,6 +11,10 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-22.04, windows-latest, macos-latest]
+    env:
+      ASSET_PATH: ""
+      ASSET_PATH_INSTALLER: ""
+      ASSET_PATH_PORTABLE: ""
 
     steps:
     - uses: actions/checkout@v4
@@ -52,7 +56,7 @@ jobs:
     - name: Package macOS
       if: runner.os == 'macOS'
       run: |
-        macdeployqt build/joymanager.app -always-overwrite
+        macdeployqt build/joymanager.app -dmg -always-overwrite
 
     - name: Package Windows
       if: runner.os == 'Windows'
@@ -72,26 +76,31 @@ jobs:
           echo "ASSET_PATH=joymanager.AppImage" >> $GITHUB_ENV
         elif [ "${{ runner.os }}" == "Windows" ]; then
           if [ -d "build/Release" ]; then
-            cd build/Release
+            BUILD_DIR="build/Release"
           else
-            cd build
+            BUILD_DIR="build"
           fi
-          FILES_TO_ZIP="joymanager.exe *.dll"
-          for dir in platforms styles iconengines imageformats; do
-            if [ -d "$dir" ]; then
-              FILES_TO_ZIP="$FILES_TO_ZIP $dir/"
-            fi
-          done
-          7z a ../../joymanager-windows.zip $FILES_TO_ZIP
+          
+          # Create Installer
+          "C:/Program Files (x86)/Inno Setup 6/ISCC.exe" /DMyAppVersion="0.0.0-preview" /DMyBuildDir="$BUILD_DIR" installer.iss
+          
+          # Create Portable SFX
+          cd $BUILD_DIR
+          7z a -sfx ../../JoyManager-Portable.exe joymanager.exe *.dll platforms/ styles/ iconengines/ imageformats/
           cd ../..
-          echo "ASSET_PATH=joymanager-windows.zip" >> $GITHUB_ENV
+          
+          echo "ASSET_PATH_INSTALLER=JoyManager-Setup.exe" >> $GITHUB_ENV
+          echo "ASSET_PATH_PORTABLE=JoyManager-Portable.exe" >> $GITHUB_ENV
         elif [ "${{ runner.os }}" == "macOS" ]; then
-          zip -r joymanager-macos.zip build/joymanager.app
-          echo "ASSET_PATH=joymanager-macos.zip" >> $GITHUB_ENV
+          mv build/joymanager.dmg joymanager.dmg
+          echo "ASSET_PATH=joymanager.dmg" >> $GITHUB_ENV
         fi
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: joymanager-${{ matrix.os }}
-        path: ${{ env.ASSET_PATH }}
+        path: |
+          ${{ env.ASSET_PATH }}
+          ${{ env.ASSET_PATH_INSTALLER }}
+          ${{ env.ASSET_PATH_PORTABLE }}
