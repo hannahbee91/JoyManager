@@ -54,17 +54,31 @@ jobs:
       run: |
         macdeployqt build/joymanager.app -always-overwrite
 
+    - name: Package Windows
+      if: runner.os == 'Windows'
+      shell: bash
+      run: |
+        if [ -f "build/Release/joymanager.exe" ]; then
+          WIN_EXE="build/Release/joymanager.exe"
+        else
+          WIN_EXE="build/joymanager.exe"
+        fi
+        windeployqt --release "$WIN_EXE"
+
     - name: Prepare Assets
       shell: bash
       run: |
         if [ "${{ runner.os }}" == "Linux" ]; then
           echo "ASSET_PATH=joymanager.AppImage" >> $GITHUB_ENV
         elif [ "${{ runner.os }}" == "Windows" ]; then
-          if [ -f "build/Release/joymanager.exe" ]; then
-            echo "ASSET_PATH=build/Release/joymanager.exe" >> $GITHUB_ENV
+          if [ -d "build/Release" ]; then
+            cd build/Release
           else
-            echo "ASSET_PATH=build/joymanager.exe" >> $GITHUB_ENV
+            cd build
           fi
+          zip -r ../../joymanager-windows.zip . -i "joymanager.exe" "*.dll" "platforms/*" "styles/*" "iconengines/*" "imageformats/*"
+          cd ../..
+          echo "ASSET_PATH=joymanager-windows.zip" >> $GITHUB_ENV
         elif [ "${{ runner.os }}" == "macOS" ]; then
           zip -r joymanager-macos.zip build/joymanager.app
           echo "ASSET_PATH=joymanager-macos.zip" >> $GITHUB_ENV
