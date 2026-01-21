@@ -76,7 +76,13 @@ jobs:
           else
             cd build
           fi
-          zip -r ../../joymanager-windows.zip . -i "joymanager.exe" "*.dll" "platforms/*" "styles/*" "iconengines/*" "imageformats/*"
+          FILES_TO_ZIP="joymanager.exe *.dll"
+          for dir in platforms styles iconengines imageformats; do
+            if [ -d "$dir" ]; then
+              FILES_TO_ZIP="$FILES_TO_ZIP $dir/"
+            fi
+          done
+          7z a ../../joymanager-windows.zip $FILES_TO_ZIP
           cd ../..
           echo "ASSET_PATH=joymanager-windows.zip" >> $GITHUB_ENV
         elif [ "${{ runner.os }}" == "macOS" ]; then
