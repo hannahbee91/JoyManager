@@ -41,6 +41,10 @@ jobs:
         os: [ubuntu-22.04, windows-latest, macos-latest]
     permissions:
       contents: write
+    env:
+      ASSET_PATH: ""
+      ASSET_PATH_INSTALLER: ""
+      ASSET_PATH_PORTABLE: ""
 
     steps:
     - uses: actions/checkout@v4
@@ -80,7 +84,18 @@ jobs:
     - name: Package macOS
       if: runner.os == 'macOS'
       run: |
-        macdeployqt build/joymanager.app -always-overwrite
+        macdeployqt build/joymanager.app -dmg -always-overwrite
+
+    - name: Package Windows
+      if: runner.os == 'Windows'
+      shell: bash
+      run: |
+        if [ -f "build/Release/joymanager.exe" ]; then
+          WIN_EXE="build/Release/joymanager.exe"
+        else
+          WIN_EXE="build/joymanager.exe"
+        fi
+        windeployqt --release "$WIN_EXE"
 
     - name: Prepare Assets
       shell: bash
@@ -88,20 +103,38 @@ jobs:
         if [ "${{ runner.os }}" == "Linux" ]; then
           echo "ASSET_PATH=joymanager.AppImage" >> $GITHUB_ENV
         elif [ "${{ runner.os }}" == "Windows" ]; then
-          if [ -f "build/Release/joymanager.exe" ]; then
-            echo "ASSET_PATH=build/Release/joymanager.exe" >> $GITHUB_ENV
+          if [ -d "build/Release" ]; then
+            BUILD_DIR="build/Release"
           else
-            echo "ASSET_PATH=build/joymanager.exe" >> $GITHUB_ENV
+            BUILD_DIR="build"
           fi
+          
+          # Create Installer
+          # Pass version if available (needs semantic release version)
+          VERSION="${{ needs.release.outputs.new_release_version }}"
+          if [ -z "$VERSION" ]; then VERSION="0.0.0"; fi
+          export MSYS_NO_PATHCONV=1
+          "C:/Program Files (x86)/Inno Setup 6/ISCC.exe" /DMyAppVersion="$VERSION" /DMyBuildDir="$BUILD_DIR" installer.iss
+          unset MSYS_NO_PATHCONV
+          
+          cd $BUILD_DIR
+          7z a -sfx ../../JoyManager-Portable.exe joymanager.exe *.dll platforms/ styles/ iconengines/ imageformats/
+          cd ../..
+          
+          echo "ASSET_PATH_INSTALLER=JoyManager-Setup.exe" >> $GITHUB_ENV
+          echo "ASSET_PATH_PORTABLE=JoyManager-Portable.exe" >> $GITHUB_ENV
         elif [ "${{ runner.os }}" == "macOS" ]; then
-          zip -r joymanager-macos.zip build/joymanager.app
-          echo "ASSET_PATH=joymanager-macos.zip" >> $GITHUB_ENV
+          mv build/joymanager.dmg joymanager.dmg
+          echo "ASSET_PATH=joymanager.dmg" >> $GITHUB_ENV
         fi
 
     - name: Upload Release Assets
       uses: softprops/action-gh-release@v2
       with:
         tag_name: v${{ needs.release.outputs.new_release_version }}
-        files: ${{ env.ASSET_PATH }}
+        files: |
+          ${{ env.ASSET_PATH }}
+          ${{ env.ASSET_PATH_INSTALLER }}
+          ${{ env.ASSET_PATH_PORTABLE }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
