@@ -113,7 +113,9 @@ jobs:
           # Pass version if available (needs semantic release version)
           VERSION="${{ needs.release.outputs.new_release_version }}"
           if [ -z "$VERSION" ]; then VERSION="0.0.0"; fi
+          export MSYS_NO_PATHCONV=1
           "C:/Program Files (x86)/Inno Setup 6/ISCC.exe" /DMyAppVersion="$VERSION" /DMyBuildDir="$BUILD_DIR" installer.iss
+          unset MSYS_NO_PATHCONV
           
           cd $BUILD_DIR
           7z a -sfx ../../JoyManager-Portable.exe joymanager.exe *.dll platforms/ styles/ iconengines/ imageformats/

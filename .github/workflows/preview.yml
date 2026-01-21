@@ -82,7 +82,9 @@ jobs:
           fi
           
           # Create Installer
+          export MSYS_NO_PATHCONV=1
           "C:/Program Files (x86)/Inno Setup 6/ISCC.exe" /DMyAppVersion="0.0.0-preview" /DMyBuildDir="$BUILD_DIR" installer.iss
+          unset MSYS_NO_PATHCONV
           
           # Create Portable SFX
           cd $BUILD_DIR
