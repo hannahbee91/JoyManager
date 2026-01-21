@@ -1,0 +1,77 @@
+name: PR Preview
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, windows-latest, macos-latest]
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: '6.2.4'
+
+    - name: Install Linux Dependencies
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libdbus-1-dev build-essential libgl1-mesa-dev
+
+    - name: Configure CMake
+      run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build
+      run: cmake --build build --config Release
+
+    - name: Package AppImage (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        wget -c https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
+        chmod +x linuxdeployqt-continuous-x86_64.AppImage
+        # Create AppDir structure
+        mkdir -p AppDir/usr/bin
+        cp build/joymanager AppDir/usr/bin/
+        cp joymanager.desktop AppDir/
+        cp joymanager.png AppDir/
+        # Run linuxdeployqt
+        unset QTDIR; unset QT_PLUGIN_PATH; unset LD_LIBRARY_PATH
+        ./linuxdeployqt-continuous-x86_64.AppImage AppDir/joymanager.desktop -appimage
+        mv JoyManager-*.AppImage joymanager.AppImage
+
+    - name: Package macOS
+      if: runner.os == 'macOS'
+      run: |
+        macdeployqt build/joymanager.app -always-overwrite
+
+    - name: Prepare Assets
+      shell: bash
+      run: |
+        if [ "${{ runner.os }}" == "Linux" ]; then
+          echo "ASSET_PATH=joymanager.AppImage" >> $GITHUB_ENV
+        elif [ "${{ runner.os }}" == "Windows" ]; then
+          if [ -f "build/Release/joymanager.exe" ]; then
+            echo "ASSET_PATH=build/Release/joymanager.exe" >> $GITHUB_ENV
+          else
+            echo "ASSET_PATH=build/joymanager.exe" >> $GITHUB_ENV
+          fi
+        elif [ "${{ runner.os }}" == "macOS" ]; then
+          zip -r joymanager-macos.zip build/joymanager.app
+          echo "ASSET_PATH=joymanager-macos.zip" >> $GITHUB_ENV
+        fi
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: joymanager-${{ matrix.os }}
+        path: ${{ env.ASSET_PATH }}

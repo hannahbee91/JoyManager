@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=JoyManager
+Exec=joymanager
+Icon=joymanager
+Comment=Manage files on Pixl.js devices
+Categories=Utility;
+Terminal=false
